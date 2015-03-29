@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import simplejson
 
 qwerty = r'''
@@ -5,6 +7,13 @@ qwerty = r'''
     qQ wW eE rR tT yY uU iI oO pP [{ ]} \|
      aA sS dD fF gG hH jJ kK lL ;: '"
       zZ xX cC vV bB nN mM ,< .> /?
+'''
+
+azerty = u'''
+²² &1 é2 "3 '4 (5 -6 è7 _8 ç9 à0 )° =+
+    aA zZ eE rR tT yY uU iI oO pP ^" $£ \|
+     qQ sS dD fF gG hH jJ kK lL mM ù% *µ
+      wW xX cC vV bB nN ,? ;. :/ !§
 '''
 
 dvorak = r'''
@@ -78,6 +87,7 @@ def build_graph(layout_str, slanted):
 if __name__ == '__main__':
     with open('adjacency_graphs.js', 'w') as f:
         for graph_name, args in [('qwerty', (qwerty, True)),
+                                 ('azerty', (azerty, True)),
                                  ('dvorak', (dvorak, True)),
                                  ('keypad', (keypad, False)),
                                  ('mac_keypad', (mac_keypad, False))]:
