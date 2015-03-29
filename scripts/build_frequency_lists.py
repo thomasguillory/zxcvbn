@@ -5,6 +5,7 @@ import codecs
 import urllib
 import simplejson
 import urllib2
+import re
 
 from pprint import pprint
 
@@ -34,7 +35,7 @@ def get_ranked_english():
 
     ranked_terms = [] # ordered by rank, in decreasing frequency.
     for url in urls:
-        html, is_cached = wiki_download(url)
+        html, is_cached = wiki_download(url,'en')
         if not is_cached:
             time.sleep(SLEEP_TIME)
         new_terms = parse_wiki_terms(html)
@@ -42,14 +43,35 @@ def get_ranked_english():
 
     return ranked_terms
 
-def wiki_download(url):
+def get_ranked_french():
+    '''
+    Same for french
+    5 pages of 2k rows
+    '''
+    URL_TMPL = "http://fr.wiktionary.org/wiki/Wiktionnaire:Listes_de_fr%%C3%%A9quence/wortschatz-fr-%s"
+    urls = []
+    for i in xrange(5):
+        freq_range = "%d-%d" % (i * 2000 + 1, (i+1) * 2000)
+        urls.append(URL_TMPL % freq_range)
+
+    ranked_terms = [] # ordered by rank, in decreasing frequency.
+    for url in urls:
+        html, is_cached = wiki_download(url,'fr')
+        if not is_cached:
+            time.sleep(SLEEP_TIME)
+        new_terms = parse_wiki_terms_fr(html)
+        ranked_terms.extend(new_terms)
+
+    return ranked_terms
+
+def wiki_download(url,lang):
     '''
     scrape friendly: sleep 20 seconds between each request, cache each result.
     '''
-    DOWNLOAD_TMPL = '../data/tv_and_movie_freqlist%s.html'
+    DOWNLOAD_TMPL = '../data/tv_and_movie_freqlist%s-%s.html'
     freq_range = url[url.rindex('/')+1:]
 
-    tmp_path = DOWNLOAD_TMPL % freq_range
+    tmp_path = DOWNLOAD_TMPL % (freq_range, lang)
     if os.path.exists(tmp_path):
         print 'cached.......', url
         with codecs.open(tmp_path, 'r', 'utf8') as f:
@@ -78,11 +100,24 @@ def parse_wiki_terms(doc):
                 continue
             last3 = [s.replace('<td>', '').replace('</td>', '').strip() for s in last3]
             rank, term, count = last3
-            rank = int(rank.split()[0])
             term = term.replace('</a>', '')
             term = term[term.index('>')+1:].lower()
             results.append(term)
     assert len(results) in [1000, 2000, 1284] # early docs have 1k entries, later have 2k, last doc has 1284
+    return results
+
+
+def parse_wiki_terms_fr(doc):
+    '''who needs an html parser. fragile hax, but checks the result at the end'''
+    results = []
+    last    = ''
+    header = True
+    for line in doc.split('\n'):
+        last = line.strip()
+        if (last.startswith('<li>')):
+            term = re.sub(r'<li>.*<a.*>(.*)</a></li>',r'\1',last)
+            results.append(term)
+    assert len(results) in [2000] # early docs have 1k entries, later have 2k, last doc has 1284
     return results
 
 def get_ranked_census_names():
@@ -149,26 +184,28 @@ def to_js(lst, lst_name):
 
 def main():
     english = get_ranked_english()
+    french  = get_ranked_french()
     surnames, male_names, female_names = get_ranked_census_names()
     passwords = get_ranked_common_passwords()
 
-    [english,
+    [english, french,
      surnames, male_names, female_names,
-     passwords] = [filter_ascii(filter_short(lst)) for lst in (english,
+     passwords] = [filter_ascii(filter_short(lst)) for lst in (english, french,
                                                                surnames, male_names, female_names,
                                                                passwords)]
 
     # make dictionaries disjoint so that d1 & d2 == set() for any two dictionaries
-    all_dicts = set(tuple(l) for l in [english, surnames, male_names, female_names, passwords])
+    all_dicts = set(tuple(l) for l in [english, french, surnames, male_names, female_names, passwords])
     passwords    = filter_dup(passwords,    all_dicts - set([tuple(passwords)]))
     male_names   = filter_dup(male_names,   all_dicts - set([tuple(male_names)]))
     female_names = filter_dup(female_names, all_dicts - set([tuple(female_names)]))
     surnames     = filter_dup(surnames,     all_dicts - set([tuple(surnames)]))
     english      = filter_dup(english,      all_dicts - set([tuple(english)]))
+    french       = filter_dup(french,       all_dicts - set([tuple(french)]))
 
     with open('../frequency_lists.js', 'w') as f: # words are all ascii at this point
         lsts = locals()
-        for lst_name in 'passwords male_names female_names surnames english'.split():
+        for lst_name in 'passwords male_names female_names surnames english french'.split():
             lst = lsts[lst_name]
             f.write(to_js(lst, lst_name))
 
@@ -178,6 +215,7 @@ def main():
     print 'female.......', len(female_names)
     print 'surnames.....', len(surnames)
     print 'english......', len(english)
+    print 'french.......', len(french)
     print
 
 if __name__ == '__main__':
